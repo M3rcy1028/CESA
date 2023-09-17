@@ -1,0 +1,104 @@
+free pch: channel. (*--public channel--*)
+type rv. (*--random value--*)
+type id. (*--identity--*)
+const Rj: bitstring[data].
+const IDSNj: id[data].
+const GID: id[private].
+free IDMDi: id[private].
+
+(*--functions--*)
+fun h1(bitstring): bitstring.
+fun h2(bitstring): bitstring.
+fun cp(rv, bitstring): bitstring. (*--Chebyshev Polynomial--*)
+fun senc(bitstring, bitstring): bitstring.
+
+(*--Symmetric encryption--*)
+reduc forall m: bitstring, k: bitstring; sdec(senc(m,k),k) = m.
+equation forall xi:rv, yj:rv; cp(xi, cp(yj, (Rj, IDSNj))) = cp(yj, cp(xi, (Rj, IDSNj))); forall xi:rv, yj:rv; cp(xi, cp(yj, (GID, Rj))) = cp(yj, cp(xi, (GID, Rj))).
+
+(*--DataBase--*)
+table DB(id, id, bitstring, bitstring).
+
+event termMDi(id, id, bitstring).
+event acceptsMDi(id, id, bitstring, bitstring).
+event acceptsSNj(id, id, bitstring).
+event termSNj(id, id, bitstring, bitstring).
+
+(*--SNj authenticates MDi--*)
+query xi: id, yj: id, sk: bitstring, m:bitstring; inj-event(termSNj(xi,yj,sk,m)) ==> inj-event(acceptsMDi(xi,yj,sk,m)).
+
+(*--MDi authenticates SNj--*)
+query xi: id, yj: id, m: bitstring; inj-event(termMDi(xi,yj,m)) ==> inj-event(acceptsSNj(xi,yj,m)).
+
+(*--Key Agreement with Session Key--*)
+query xi: id, yj: id, sk: bitstring, sk': bitstring, m:bitstring; event(termSNj(xi,yj,sk,m)) && event(acceptsMDi(xi,yj,sk',m)) ==> sk=sk'.
+
+query attacker (IDMDi).
+
+query attacker (GID).
+
+(*--MD--*)
+let clientMDi(IDMDi:id, GID:id, kmdi:rv, kg:rv, IDSNj:id, pkSNj:bitstring)=
+ new xi: rv;
+ new thi: rv;
+ let P1i=cp(xi, pkSNj) in
+ let T1i=cp(kmdi, (GID, IDMDi, kmdi)) in
+ let T2i=cp(xi, (IDSNj, Rj)) in (*--key to create P1i--*)
+ let T3i=cp(xi, (IDSNj, IDMDi, GID)) in 
+ let T4i=cp(kg, (GID, kg)) in
+ let T5i=cp(kg, (IDSNj, GID, Rj)) in
+ let MAC1i=h1((P1i, IDSNj, IDMDi, GID, T1i, T2i, T3i, thi)) in
+ let MAC1=MAC1i in
+ let E1i=senc((GID, IDMDi, T1i, T3i, T4i, T5i, thi, MAC1), P1i) in
+ 
+ out(pch, (IDSNj, E1i, T2i));
+ in(pch, E2:bitstring);
+ 
+ let (Tkj:bitstring, Tyj:bitstring, MAC2:bitstring) = sdec(E2, P1i) in
+ let P2'=cp(kg, Tkj) in
+ 
+ if MAC2=h1((P2', GID, IDSNj)) then
+ event termMDi(IDMDi, IDSNj, (Tkj, Tyj, MAC2));
+ 
+ let SKMDi'=h2((cp(xi,Tyj), IDSNj, IDMDi, GID, thi)) in
+ let MAC3=h1((SKMDi', IDSNj, IDMDi, GID, Tyj, T3i)) in
+ 
+ event acceptsMDi(IDMDi, IDSNj, SKMDi', MAC3);
+ out(pch, MAC3).
+
+(*--SN--*)
+let serverSN(IDSNj:id, pkSNj:bitstring, kj:rv)=
+ out(pch, (IDSNj, pkSNj));
+ in(pch, (IDSNx:id, MAC1:bitstring, E1i:bitstring, T2n:bitstring));
+ 
+ if IDSNx=IDSNj then
+ let P1i'=cp(kj, T2n) in
+ let (GID':id, IDMDn:id, T1n:bitstring, T3n:bitstring, T4n:bitstring, T5n:bitstring, thn:rv, AMAC:bitstring) = sdec(E1i, P1i') in
+
+ (*--Check whether MDi is legitimate or not--*)
+ get DB(=IDMDn, =GID', hgm, hgl) in
+ if hgm=h1((T1n)) then
+ if hgl=h1((T4n)) then
+ 
+ let MAC1'=h1((P1i', IDSNj, IDMDn, GID', T1n, T2n, T3n, thn)) in
+ if (AMAC=MAC1') then
+ new yj:rv;
+ let Tyj=cp(yj, (IDSNj, IDMDn, GID')) in
+ let Tkj=cp(kj, (IDSNj, GID', Rj)) in
+ let P2=(kj, T5n) in
+ let MAC2=h1((P2, GID', IDSNj)) in
+ let SKMDi=h2((cp(yj, T3n), GID', IDMDn, IDSNj, thn)) in
+ let E2=senc((Tkj, Tyj, MAC2), P1i') in
+ 
+ event acceptsSNj(IDMDn, IDSNj, (Tyj, P2, MAC2));
+ out(pch, (E2));
+ in(pch, MAC3:bitstring);
+ if(MAC3=h1((SKMDi, IDSNj, IDMDn, GID', Tyj, T3n))) then
+ event termSNj(IDMDn, IDSNj, SKMDi, MAC3).
+ 
+process
+ new kj:rv;
+ new kmdi:rv;
+ new kg:rv;
+ insert DB(IDMDi, GID, h1((cp(kmdi, (GID, IDMDi, kmdi)))), h1(((cp(kg, (GID, kg))))));
+(((!clientMDi(IDMDi,GID, kmdi, kg, IDSNj, cp(kj,(IDSNj, Rj)))) | (!serverSN(IDSNj, cp(kj,(IDSNj, Rj)), kj))))

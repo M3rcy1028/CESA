@@ -1,0 +1,94 @@
+free pch: channel. (*--public channel--*)
+type rv. (*--random value--*)
+type id. (*--identity--*)
+const Rj: bitstring[data].
+const IDSNj: id[data].
+free IDUEi: id[private].
+
+(*--functions--*)
+fun h1(bitstring): bitstring.
+fun h2(bitstring): bitstring.
+fun cp(rv, bitstring): bitstring. (*--Chebyshev Polynomial--*)
+fun senc(bitstring, bitstring): bitstring.
+
+(*--Symmetric encryption--*)
+reduc forall m: bitstring, k: bitstring; sdec(senc(m,k),k) = m.
+equation forall xi:rv, yj:rv; cp(xi, cp(yj, (Rj, IDSNj))) = cp(yj, cp(xi, (Rj, IDSNj))).
+
+(*--DataBase--*)
+table DB(id, bitstring).
+
+event termUEi(id, id, bitstring).
+event acceptsUEi(id, id, bitstring, bitstring).
+event acceptsSNj(id, id, bitstring).
+event termSNj(id, id, bitstring, bitstring).
+
+(*--SNj authenticates UEi--*)
+query xi: id, yj: id, sk: bitstring, m:bitstring; inj-event(termSNj(xi,yj,sk,m)) ==> inj-event(acceptsUEi(xi,yj,sk,m)).
+
+(*--UEi authenticates SNj--*)
+query xi: id, yj: id, m: bitstring; inj-event(termUEi(xi,yj,m)) ==> inj-event(acceptsSNj(xi,yj,m)).
+
+(*--Key Agreement with Session Key--*)
+query xi: id, yj: id, sk: bitstring, sk': bitstring, m:bitstring; event(termSNj(xi,yj,sk,m)) && event(acceptsUEi(xi,yj,sk',m)) ==> sk=sk'.
+
+query attacker (IDUEi).
+
+(*--UE--*)
+let clientUEi(IDUEi:id, kuei:rv, IDSNj:id, pkSNj:bitstring)=
+ new xi: rv;
+ let P1=cp(xi, pkSNj) in
+ let T1=cp(xi, (IDSNj, IDUEi)) in
+ let T2=cp(xi, (IDSNj, Rj)) in 		(*--key to create P1i--*)
+ let T3=cp(kuei, (IDUEi, kuei)) in	(*--UEi verification--*)
+ let T4=cp(xi, (IDUEi, Rj)) in 
+ let MAC1=h1((P1, IDSNj, IDUEi, T1, T3)) in
+ let E1=senc((IDUEi, T1, T3, T4, MAC1), P1) in
+ 
+ out(pch, (IDSNj, E1, T2));
+ in(pch, E2:bitstring);
+ 
+ let (Tkj:bitstring, Tyj:bitstring, MAC2:bitstring) = sdec(E2, P1) in
+ let P2'=cp(xi, Tkj) in
+ let SKUEi'=h2((xi, Tyj)) in
+ if MAC2=h1((P1, P2', IDUEi, IDSNj, Tkj, Tyj, T3, SKUEi')) then
+ event termUEi(IDUEi, IDSNj, (Tkj, Tyj, MAC2));
+ 
+ let MAC3=h1((SKUEi', IDSNj, IDUEi, Tyj, T3)) in
+ event acceptsUEi(IDUEi, IDSNj, SKUEi', MAC3);
+ out(pch, MAC3).
+
+(*--SN--*)
+let serverSN(IDSNj:id, pkSNj:bitstring, kj:rv)=
+ out(pch, (IDSNj, pkSNj));
+ in(pch, (IDSNx:id, E1':bitstring, T2':bitstring));
+ 
+ if IDSNx=IDSNj then
+ let P1'=cp(kj, T2') in
+ let (IDUEn:id, T1':bitstring, T3':bitstring, T4':bitstring, MAC1':bitstring) = sdec(E1', P1') in
+
+ (*--Check whether UEi is legitimate or not--*)
+ get DB(=IDUEn, huq) in
+ if huq=h1((T3')) then
+ 
+ let RMAC1=h1((P1', IDSNj, IDUEn, T1', T3')) in
+ if (RMAC1=MAC1') then
+ new yj:rv;
+ let Tyj=cp(yj, (IDSNj, IDUEn)) in
+ let Tkj=cp(kj, (IDUEn, Rj)) in
+ let P2=(kj, T4') in
+ let SKUEi=h2((cp(yj, T1'))) in
+ let MAC2=h1((P1', P2, IDUEn, IDSNj, Tkj, Tyj, T3', SKUEi)) in
+ let E2=senc((Tkj, Tyj, MAC2), P1') in
+ 
+ event acceptsSNj(IDUEn, IDSNj, (Tyj, P2, MAC2));
+ out(pch, (E2));
+ in(pch, MAC3:bitstring);
+ if(MAC3=h1(((SKUEi, IDSNj, IDUEn, Tyj, T3')))) then
+ event termSNj(IDUEn, IDSNj, SKUEi, MAC3).
+ 
+process
+ new kj:rv;
+ new kuei:rv;
+ insert DB(IDUEi, h1((cp(kuei, (IDUEi, kuei)))));
+(((!clientUEi(IDUEi, kuei, IDSNj, cp(kj,(IDSNj, Rj)))) | (!serverSN(IDSNj, cp(kj,(IDSNj, Rj)), kj))))

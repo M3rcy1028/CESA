@@ -1,0 +1,50 @@
+//Define functions
+hashfunction h1, h2, xor, cp;
+
+protocol UE (UEi, SNj, KGC)
+{
+	role UEi
+	{
+		fresh xi: Nonce;
+		var Rj, yj, kj, kuei, SKSNj: Nonce;
+		macro SKUEi = h2(cp(xi, cp(yj, xor(SNj, UEi))));
+
+		recv_1 (KGC, UEi, {KGC, UEi, SNj, kuei, Rj, cp(kuei, xor(UEi, kuei)), cp(kj, xor(SNj, Rj))}k(KGC, UEi));
+		send_3 (UEi, SNj, SNj, cp(xi, xor(SNj, Rj)), {UEi, cp(xi, xor(SNj, UEi)), cp(kuei, xor(UEi, kuei)), cp(xi, xor(UEi, Rj)), h1(cp(xi, cp(kj, xor(SNj, Rj))), UEi, SNj, cp(xi, xor(SNj, UEi)), cp(kuei, xor(UEi, kuei)))}cp(xi, cp(kj, xor(SNj, Rj))));
+		recv_4 (SNj, UEi, {cp(yj, xor(SNj, UEi)), cp(kj, xor(UEi, Rj)), h1(cp(kj, cp(kj, cp(xi, xor(SNj, Rj))), cp(xi, xor(UEi, Rj))), UEi, SNj, cp(kj, xor(UEi, Rj)), cp(kuei, xor(UEi, kuei)), cp(yj, xor(SNj, UEi)))}cp(yj, cp(xi, xor(SNj, Rj))));
+
+		claim (UEi, Secret, SKUEi);
+		claim (UEi, Alive);
+		claim (UEi, Weakagree);
+		claim (UEi, Niagree);
+		claim (UEi, Nisynch);
+	}
+
+	role SNj
+	{
+		fresh yj: Nonce;
+		var Rj, xi, kuei, kj: Nonce;
+		macro SKSNj = h2(cp(yj, cp(xi, xor(SNj, UEi))));
+
+		recv_2 (KGC, SNj, {KGC, UEi, SNj, kj, Rj, h1(cp(kuei, xor(UEi, kuei))), cp(kj, xor(SNj, Rj))}k(KGC, SNj));
+		recv_3 (UEi, SNj, SNj, cp(xi, xor(SNj, Rj)), {UEi, cp(xi, xor(SNj, UEi)), cp(kuei, xor(UEi, kuei)), cp(xi, xor(UEi, Rj)), h1(cp(xi, cp(kj, xor(SNj, Rj))), UEi, SNj, cp(xi, xor(SNj, UEi)), cp(kuei, xor(UEi, kuei)))}cp(xi, cp(kj, xor(SNj, Rj))));
+		send_4 (SNj, UEi, {cp(yj, xor(SNj, UEi)), cp(kj, xor(UEi, Rj)), h1(cp(kj, cp(kj, cp(xi, xor(SNj, Rj))), cp(xi, xor(UEi, Rj))), UEi, SNj, cp(kj, xor(UEi, Rj)), cp(kuei, xor(UEi, kuei)), cp(yj, xor(SNj, UEi)))}cp(yj, cp(xi, xor(SNj, Rj))));
+
+		claim (SNj, Secret, SKSNj);
+		claim (SNj, Alive);
+		claim (SNj, Weakagree);
+		claim (SNj, Niagree);
+		claim (SNj, Nisynch);
+	}
+
+	role KGC
+	{
+		fresh kj, kuei: Nonce;
+		fresh Rj: Nonce;
+		send_1 (KGC, UEi, {KGC, UEi, SNj, kuei, Rj, cp(kuei, xor(UEi, kuei)), cp(kj, xor(SNj, Rj))}k(KGC, UEi));
+		send_2 (KGC, SNj, {KGC, UEi, SNj, kj, Rj, h1(cp(kuei, xor(UEi, kuei))), cp(kj, xor(SNj, Rj))}k(KGC, SNj));
+
+		claim (KGC, Secret, kuei);
+		claim (KGC, Secret, kj);
+	}
+}
