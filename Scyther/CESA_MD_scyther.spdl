@@ -1,0 +1,105 @@
+//Define functions
+
+hashfunction h1, h2, xor, cp;
+
+
+
+protocol MD (MDi, SNj, KGC)
+
+{
+
+	role MDi
+
+	{
+
+		fresh xi, ti: Nonce;
+
+		var Rj, yj, kj, kmdi, kg, GID, SKMDj: Nonce;
+
+		macro SKMDi = h2(cp(xi, cp(yj, xor(MDi, GID, SNj))), MDi, GID, SNj, ti);
+
+
+
+		recv_1 (KGC, MDi, {KGC, MDi, GID, kg, kmdi, SNj, Rj, cp(kmdi, xor(kg, MDi, kmdi)), cp(kmdi, xor(kg, MDi, kmdi)), cp(kj, xor(SNj, Rj))}k(KGC, MDi));
+
+		send_3 (MDi, SNj, SNj, cp(xi, xor(SNj, Rj)), h1(cp(xi, cp(kj, xor(SNj, Rj))), MDi, GID, SNj, cp(kmdi, xor(MDi, GID, kmdi)), cp(xi, xor(MDi, Rj)), cp(xi, xor(SNj, MDi)), ti), {MDi, cp(xi, xor(SNj, MDi)), cp(kmdi, xor(MDi, GID, kmdi)), ti}cp(xi, cp(kj, xor(SNj, Rj))));
+
+		recv_4 (SNj, MDi, {cp(kmdi, xor(GID, SNj, Rj)), cp(yj, xor(MDi, GID, SNj))}cp(yj, cp(xi, xor(SNj, Rj))));
+
+		send_5 (MDi, SNj, h1(SKMDi, MDi, GID, SNj, cp(yj, xor(MDi, GID, SNj)), cp(xi, xor(MDi, GID, SNj))));
+
+
+
+		claim (MDi, Secret, SKMDi);
+
+		claim (MDi, Alive);
+
+		claim (MDi, Weakagree);
+
+		claim (MDi, Niagree);
+
+		claim (MDi, Nisynch);
+
+	}
+
+
+
+	role SNj
+
+	{
+
+		fresh yj: Nonce;
+
+		var Rj, xi, ti, kmdi, kg, GID, kj: Nonce;
+
+		macro SKSNj = h2(cp(yj, cp(xi, xor(MDi, GID, SNj))), MDi, GID, SNj, ti);
+
+
+
+		recv_2 (KGC, SNj, {KGC, MDi, GID, kg, SNj, kj, Rj, h1(cp(kmdi, xor(MDi, kmdi))), h1(cp(kmdi, xor(kg, MDi, kmdi))), cp(kj, xor(SNj, Rj))}k(KGC, SNj));
+
+		recv_3 (MDi, SNj, SNj, cp(xi, xor(SNj, Rj)), h1(cp(xi, cp(kj, xor(SNj, Rj))), MDi, GID, SNj, cp(kmdi, xor(MDi, GID, kmdi)), cp(xi, xor(MDi, Rj)), cp(xi, xor(SNj, MDi)), ti), {MDi, cp(xi, xor(SNj, MDi)), cp(kmdi, xor(MDi, GID, kmdi)), ti}cp(xi, cp(kj, xor(SNj, Rj))));
+
+		send_4 (SNj, MDi, {cp(kmdi, xor(GID, SNj, Rj)), cp(yj, xor(MDi, GID, SNj))}cp(yj, cp(xi, xor(SNj, Rj))));
+
+		recv_5 (MDi, SNj, h1(SKMDi, MDi, GID, SNj, cp(yj, xor(MDi, GID, SNj)), cp(xi, xor(MDi, GID, SNj))));
+
+
+
+		claim (SNj, Secret, SKSNj);
+
+		claim (SNj, Alive);
+
+		claim (SNj, Weakagree);
+
+		claim (SNj, Niagree);
+
+		claim (SNj, Nisynch);
+
+	}
+
+
+
+	role KGC
+
+	{
+
+		fresh kj, kmdi, kg, GID: Nonce;
+
+		fresh Rj: Nonce;
+
+		send_1 (KGC, MDi, {KGC, MDi, GID, kg, kmdi, SNj, Rj, cp(kmdi, xor(kg, MDi, kmdi)), cp(kmdi, xor(kg, MDi, kmdi)), cp(kj, xor(SNj, Rj))}k(KGC, MDi));
+
+		send_2 (KGC, SNj, {KGC, MDi, GID, kg, SNj, kj, Rj, h1(cp(kmdi, xor(MDi, kmdi))), h1(cp(kmdi, xor(kg, MDi, kmdi))), cp(kj, xor(SNj, Rj))}k(KGC, SNj));
+
+
+
+		claim (KGC, Secret, kmdi);
+
+		claim (KGC, Secret, kg);
+
+		claim (KGC, Secret, kj);
+
+	}
+
+}
